@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Problem Progress Tracker</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5a623;
+            --background-color: #f0f4f8;
+            --text-color: #333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            max-width: 800px;
+            width: 90%;
+        }
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .problem-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .problem-button.done {
+            background-color: var(--secondary-color);
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .control-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+        .control-button:hover {
+            background-color: #3a7bc8;
+        }
+        .progress-stats {
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Problem Progress Tracker</h1>
+        
+        <div id="settings-page" class="page active">
+            <div class="form-group">
+                <label for="start-problem">시작 문제 번호:</label>
+                <input type="number" id="start-problem" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label for="end-problem">끝 문제 번호:</label>
+                <input type="number" id="end-problem" min="1" value="20">
+            </div>
+            <button class="control-button" onclick="startTracking()">시작하기</button>
+        </div>
+        
+        <div id="progress-page" class="page">
+            <div class="progress-stats" id="progress-stats"></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="buttons-grid" id="buttons-grid"></div>
+            <button class="control-button" onclick="resetProblems()">초기화</button>
+            <button class="control-button" onclick="backToSettings()">설정으로 돌아가기</button>
+            <button class="control-button" onclick="shareProgress()">진행 상황 공유</button>
+        </div>
+    </div>
+
+    <script>
+        let startProblem, endProblem, totalProblems, completedProblems;
+
+        function startTracking() {
+            startProblem = parseInt(document.getElementById('start-problem').value);
+            endProblem = parseInt(document.getElementById('end-problem').value);
+            
+            if (startProblem > endProblem) {
+                alert("시작 문제 번호는 끝 문제 번호보다 작아야 합니다.");
+                return;
+            }
+            
+            totalProblems = endProblem - startProblem + 1;
+            completedProblems = 0;
+            
+            document.getElementById('settings-page').classList.remove('active');
+            document.getElementById('progress-page').classList.add('active');
+            createProblemButtons();
+            loadProgress();
+            updateProgress();
+        }
+
+        function createProblemButtons() {
+            const buttonsGrid = document.getElementById('buttons-grid');
+            buttonsGrid.innerHTML = '';
+            for (let i = startProblem; i <= endProblem; i++) {
+                const button = document.createElement('button');
+                button.classList.add('problem-button');
+                button.textContent = `문제 ${i}`;
+                button.onclick = () => toggleProblem(button, i);
+                buttonsGrid.appendChild(button);
+            }
+        }
+
+        function toggleProblem(button, problemNumber) {
+            if (button.classList.contains('done')) {
+                button.classList.remove('done');
+                completedProblems--;
+            } else {
+                button.classList.add('done');
+                completedProblems++;
+            }
+            updateProgress();
+            saveProgress();
+        }
+
+        function updateProgress() {
+            const progressPercent = (completedProblems / totalProblems) * 100;
+            document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+            
+            const statsElement = document.getElementById('progress-stats');
+            statsElement.innerHTML = `
+                <strong>전체 문제:</strong> ${totalProblems}개<br>
+                <strong>풀은 문제:</strong> ${completedProblems}개<br>
+                <strong>완료율:</strong> ${progressPercent.toFixed(1)}%
+            `;
+        }
+
+        function resetProblems() {
+            completedProblems = 0;
+            const buttons = document.getElementsByClassName('problem-button');
+            for (let button of buttons) {
+                button.classList.remove('done');
+            }
+            updateProgress();
+            saveProgress();
+        }
+
+        function backToSettings() {
+            document.getElementById('progress-page').classList.remove('active');
+            document.getElementById('settings-page').classList.add('active');
+            resetProblems();
+        }
+
+        function saveProgress() {
+            const progress = {
+                startProblem,
+                endProblem,
+                completedProblems,
+                doneProblems: Array.from(document.getElementsByClassName('problem-button'))
+                    .map((button, index) => ({ index: index + startProblem, done: button.classList.contains('done') }))
+                    .filter(problem => problem.done)
+                    .map(problem => problem.index)
+            };
+            localStorage.setItem('problemProgress', JSON.stringify(progress));
+        }
+
+        function loadProgress() {
+            const savedProgress = localStorage.getItem('problemProgress');
+            if (savedProgress) {
+                const progress = JSON.parse(savedProgress);
+                if (progress.startProblem === startProblem && progress.endProblem === endProblem) {
+                    completedProblems = progress.completedProblems;
+                    const buttons = document.getElementsByClassName('problem-button');
+                    progress.doneProblems.forEach(problemNumber => {
+                        buttons[problemNumber - startProblem].classList.add('done');
+                    });
+                }
+            }
+        }
+
+        function shareProgress() {
+            const shareUrl = `${window.location.href}?start=${startProblem}&end=${endProblem}&completed=${completedProblems}`;
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert("공유 링크가 클립보드에 복사되었습니다.");
+            }).catch(err => {
+                console.error('클립보드 복사 실패:', err);
+                alert("공유 링크: " + shareUrl);
+            });
+        }
+
+        // URL 매개변수로부터 초기 상태 로드
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlStart = urlParams.get('start');
+        const urlEnd = urlParams.get('end');
+        const urlCompleted = urlParams.get('completed');
+
+        if (urlStart && urlEnd && urlCompleted) {
+            document.getElementById('start-problem').value = urlStart;
+            document.getElementById('end-problem').value = urlEnd;
+            startTracking();
+            completedProblems = parseInt(urlCompleted);
+            updateProgress();
+        }
+    </script>
+</body>
+</html>
