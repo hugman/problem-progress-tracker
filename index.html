@@ -10,6 +10,7 @@
             --secondary-color: #f5a623;
             --background-color: #f0f4f8;
             --text-color: #333;
+            --error-color: #e74c3c;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -49,12 +50,24 @@
             margin-bottom: 0.5rem;
             font-weight: bold;
         }
-        input[type="number"] {
+        input[type="number"], input[type="text"] {
             width: 100%;
             padding: 0.5rem;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 1rem;
+        }
+        .mode-selector {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 1rem;
+        }
+        .mode-option {
+            display: flex;
+            align-items: center;
+        }
+        .mode-option input[type="radio"] {
+            margin-right: 0.5rem;
         }
         .buttons-grid {
             display: grid;
@@ -99,6 +112,7 @@
             cursor: pointer;
             transition: background-color 0.3s ease;
             margin-right: 10px;
+            margin-bottom: 10px;
         }
         .control-button:hover {
             background-color: #3a7bc8;
@@ -111,6 +125,11 @@
             font-size: 1rem;
             line-height: 1.5;
         }
+        .error-message {
+            color: var(--error-color);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -118,14 +137,37 @@
         <h1>Problem Progress Tracker</h1>
         
         <div id="settings-page" class="page active">
-            <div class="form-group">
-                <label for="start-problem">시작 문제 번호:</label>
-                <input type="number" id="start-problem" min="1" value="1">
+            <div class="mode-selector">
+                <div class="mode-option">
+                    <input type="radio" id="individual-mode" name="mode" value="individual" checked>
+                    <label for="individual-mode">개별 문제 모드</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="continuous-mode" name="mode" value="continuous">
+                    <label for="continuous-mode">연속 문제 모드</label>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="end-problem">끝 문제 번호:</label>
-                <input type="number" id="end-problem" min="1" value="20">
+            
+            <div id="individual-settings">
+                <div class="form-group">
+                    <label for="problem-numbers">문제 번호 (쉼표로 구분):</label>
+                    <input type="text" id="problem-numbers" placeholder="예: 4,5,10,32,12">
+                    <div id="problem-numbers-error" class="error-message"></div>
+                </div>
             </div>
+            
+            <div id="continuous-settings" style="display: none;">
+                <div class="form-group">
+                    <label for="start-problem">시작 문제 번호:</label>
+                    <input type="number" id="start-problem" min="1" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="end-problem">끝 문제 번호:</label>
+                    <input type="number" id="end-problem" min="1" value="20">
+                    <div id="range-error" class="error-message"></div>
+                </div>
+            </div>
+            
             <button class="control-button" onclick="startTracking()">시작하기</button>
         </div>
         
@@ -142,129 +184,112 @@
     </div>
 
     <script>
-        let startProblem, endProblem, totalProblems, completedProblems;
+    let problemNumbers = [];
+    let completedProblems = 0;
 
-        function startTracking() {
-            startProblem = parseInt(document.getElementById('start-problem').value);
-            endProblem = parseInt(document.getElementById('end-problem').value);
-            
-            if (startProblem > endProblem) {
-                alert("시작 문제 번호는 끝 문제 번호보다 작아야 합니다.");
+    window.startTracking = function() {
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+        
+        if (mode === 'individual') {
+            const customNumbers = document.getElementById('problem-numbers').value.trim();
+            if (!customNumbers) {
+                document.getElementById('problem-numbers-error').textContent = '문제 번호를 입력해주세요.';
                 return;
             }
-            
-            totalProblems = endProblem - startProblem + 1;
-            completedProblems = 0;
-            
-            document.getElementById('settings-page').classList.remove('active');
-            document.getElementById('progress-page').classList.add('active');
-            createProblemButtons();
-            loadProgress();
-            updateProgress();
-        }
-
-        function createProblemButtons() {
-            const buttonsGrid = document.getElementById('buttons-grid');
-            buttonsGrid.innerHTML = '';
-            for (let i = startProblem; i <= endProblem; i++) {
-                const button = document.createElement('button');
-                button.classList.add('problem-button');
-                button.textContent = `문제 ${i}`;
-                button.onclick = () => toggleProblem(button, i);
-                buttonsGrid.appendChild(button);
+            problemNumbers = customNumbers.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+            if (problemNumbers.length === 0) {
+                document.getElementById('problem-numbers-error').textContent = '유효한 문제 번호를 입력해주세요.';
+                return;
             }
-        }
-
-        function toggleProblem(button, problemNumber) {
-            if (button.classList.contains('done')) {
-                button.classList.remove('done');
-                completedProblems--;
-            } else {
-                button.classList.add('done');
-                completedProblems++;
+        } else {
+            const startProblem = parseInt(document.getElementById('start-problem').value);
+            const endProblem = parseInt(document.getElementById('end-problem').value);
+            if (startProblem > endProblem) {
+                document.getElementById('range-error').textContent = '시작 번호는 끝 번호보다 작거나 같아야 합니다.';
+                return;
             }
-            updateProgress();
-            saveProgress();
+            problemNumbers = Array.from({length: endProblem - startProblem + 1}, (_, i) => i + startProblem);
         }
 
-        function updateProgress() {
-            const progressPercent = (completedProblems / totalProblems) * 100;
-            document.getElementById('progress-fill').style.width = `${progressPercent}%`;
-            
-            const statsElement = document.getElementById('progress-stats');
-            statsElement.innerHTML = `
-                <strong>전체 문제:</strong> ${totalProblems}개<br>
-                <strong>풀은 문제:</strong> ${completedProblems}개<br>
-                <strong>완료율:</strong> ${progressPercent.toFixed(1)}%
-            `;
-        }
+        completedProblems = 0;
+        document.getElementById('settings-page').classList.remove('active');
+        document.getElementById('progress-page').classList.add('active');
+        createProblemButtons();
+        updateProgress();
+    }
 
-        function resetProblems() {
-            completedProblems = 0;
-            const buttons = document.getElementsByClassName('problem-button');
-            for (let button of buttons) {
-                button.classList.remove('done');
-            }
-            updateProgress();
-            saveProgress();
-        }
+    function createProblemButtons() {
+        const buttonsGrid = document.getElementById('buttons-grid');
+        buttonsGrid.innerHTML = '';
+        problemNumbers.forEach(num => {
+            const button = document.createElement('button');
+            button.classList.add('problem-button');
+            button.textContent = `문제 ${num}`;
+            button.onclick = () => toggleProblem(button, num);
+            buttonsGrid.appendChild(button);
+        });
+    }
 
-        function backToSettings() {
-            document.getElementById('progress-page').classList.remove('active');
-            document.getElementById('settings-page').classList.add('active');
-            resetProblems();
+    function toggleProblem(button, problemNumber) {
+        if (button.classList.contains('done')) {
+            button.classList.remove('done');
+            completedProblems--;
+        } else {
+            button.classList.add('done');
+            completedProblems++;
         }
+        updateProgress();
+    }
 
-        function saveProgress() {
-            const progress = {
-                startProblem,
-                endProblem,
-                completedProblems,
-                doneProblems: Array.from(document.getElementsByClassName('problem-button'))
-                    .map((button, index) => ({ index: index + startProblem, done: button.classList.contains('done') }))
-                    .filter(problem => problem.done)
-                    .map(problem => problem.index)
-            };
-            localStorage.setItem('problemProgress', JSON.stringify(progress));
+    function updateProgress() {
+        const totalProblems = problemNumbers.length;
+        const progressPercent = (completedProblems / totalProblems) * 100;
+        document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+        
+        const statsElement = document.getElementById('progress-stats');
+        statsElement.innerHTML = `
+            <strong>전체 문제:</strong> ${totalProblems}개<br>
+            <strong>풀은 문제:</strong> ${completedProblems}개<br>
+            <strong>완료율:</strong> ${progressPercent.toFixed(1)}%
+        `;
+    }
+
+    window.resetProblems = function() {
+        completedProblems = 0;
+        const buttons = document.getElementsByClassName('problem-button');
+        for (let button of buttons) {
+            button.classList.remove('done');
         }
+        updateProgress();
+    }
 
-        function loadProgress() {
-            const savedProgress = localStorage.getItem('problemProgress');
-            if (savedProgress) {
-                const progress = JSON.parse(savedProgress);
-                if (progress.startProblem === startProblem && progress.endProblem === endProblem) {
-                    completedProblems = progress.completedProblems;
-                    const buttons = document.getElementsByClassName('problem-button');
-                    progress.doneProblems.forEach(problemNumber => {
-                        buttons[problemNumber - startProblem].classList.add('done');
-                    });
-                }
-            }
+    window.backToSettings = function() {
+        document.getElementById('progress-page').classList.remove('active');
+        document.getElementById('settings-page').classList.add('active');
+        resetProblems();
+    }
+
+    window.shareProgress = function() {
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+        let shareUrl;
+        if (mode === 'individual') {
+            shareUrl = `${window.location.href.split('?')[0]}?mode=individual&numbers=${problemNumbers.join(',')}&completed=${completedProblems}`;
+        } else {
+            shareUrl = `${window.location.href.split('?')[0]}?mode=continuous&start=${problemNumbers[0]}&end=${problemNumbers[problemNumbers.length-1]}&completed=${completedProblems}`;
         }
+        alert("공유 링크: " + shareUrl);
+    }
 
-        function shareProgress() {
-            const shareUrl = `${window.location.href}?start=${startProblem}&end=${endProblem}&completed=${completedProblems}`;
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                alert("공유 링크가 클립보드에 복사되었습니다.");
-            }).catch(err => {
-                console.error('클립보드 복사 실패:', err);
-                alert("공유 링크: " + shareUrl);
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('input[name="mode"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.getElementById('individual-settings').style.display = 
+                    this.value === 'individual' ? 'block' : 'none';
+                document.getElementById('continuous-settings').style.display = 
+                    this.value === 'continuous' ? 'block' : 'none';
             });
-        }
-
-        // URL 매개변수로부터 초기 상태 로드
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlStart = urlParams.get('start');
-        const urlEnd = urlParams.get('end');
-        const urlCompleted = urlParams.get('completed');
-
-        if (urlStart && urlEnd && urlCompleted) {
-            document.getElementById('start-problem').value = urlStart;
-            document.getElementById('end-problem').value = urlEnd;
-            startTracking();
-            completedProblems = parseInt(urlCompleted);
-            updateProgress();
-        }
+        });
+    });
     </script>
 </body>
 </html>
